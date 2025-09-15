@@ -1,2 +1,1 @@
-# psico_sas_sp1
-
+# Sistema de Gestión para Psicólogos - SAS SP1
