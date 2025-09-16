@@ -156,6 +156,7 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
+    "https://psico-admin-sp1-despliegue-front.vercel.app",
     "http://localhost:3000",      # Puerto común para React
     "http://127.0.0.1:3000",
     "http://localhost:5173",      # Añade la URL de Vite aquí
