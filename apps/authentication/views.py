@@ -122,17 +122,19 @@ def password_reset_request(request):
         
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# ... (El resto de tus vistas: password_reset_confirm, etc., se quedan igual) ...
+# apps/authentication/views.py
+
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def password_reset_confirm(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)
     if serializer.is_valid():
+        # Obtener TODOS los datos validados del serializer
         token = serializer.validated_data['token']
         new_password = serializer.validated_data['new_password']
+        uid = serializer.validated_data['uid'] # <--- LÍNEA CORREGIDA
         
         try:
-            uid = request.data.get('uid')
             user_id = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=user_id)
             
@@ -143,7 +145,10 @@ def password_reset_confirm(request):
             else:
                 return Response({'error': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
         except:
+            # Esto atrapa errores si el uid es inválido (ej. decodificación falla)
             return Response({'error': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Si el serializer no es válido, retorna los errores (esto es lo que ves como 400)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
