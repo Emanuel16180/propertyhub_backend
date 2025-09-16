@@ -106,6 +106,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     """
     Serializer para confirmar reset de contraseña - CU-04
     """
+    # --- 1. AÑADE ESTA LÍNEA ---
+    uid = serializers.CharField(write_only=True) # <-- Acepta el uid que envía el frontend
+
     token = serializers.CharField()
     new_password = serializers.CharField(validators=[validate_password])
     new_password_confirm = serializers.CharField()
@@ -114,8 +117,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['new_password_confirm']:
             raise serializers.ValidationError("Las contraseñas no coinciden")
         return attrs
-
-
+        
 class ChangePasswordSerializer(serializers.Serializer):
     """
     Serializer para cambiar contraseña - CU-05
