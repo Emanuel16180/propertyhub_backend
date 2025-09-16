@@ -17,6 +17,8 @@ urlpatterns = [
     
     # API browsable (para desarrollo)
     path('api-auth/', include('rest_framework.urls')),
+
+    path('api/', include('apps.chat.urls')),
 ]
 
 # Servir archivos media y static en desarrollo

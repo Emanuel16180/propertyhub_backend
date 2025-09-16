@@ -33,7 +33,6 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=Csv())
 
 INSTALLED_APPS = [
     'channels',
-    'apps.chat.apps.ChatConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +48,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.professionals',
     'apps.appointments',
+    'apps.chat',
 ]
 
 MIDDLEWARE = [
