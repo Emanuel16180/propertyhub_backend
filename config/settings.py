@@ -179,7 +179,7 @@ CHANNEL_LAYERS = {
     },
 }
 # URL donde corre tu App de React (Vite usa el puerto 5173 por defecto)
-FRONTEND_URL_LOCAL = 'http://localhost:5173'
+FRONTEND_URL_LOCAL = 'https://psico-admin-sp1-despliegue-front.vercel.app'
 # ---------------------------------------------------------------
 # CONFIGURACIÓN DE CORREO (SMTP DE GMAIL) PARA PSICO SAS
 # ---------------------------------------------------------------
