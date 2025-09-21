@@ -141,14 +141,14 @@ AUTH_USER_MODEL = 'users.CustomUser'
 # Django REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 30,
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
@@ -165,17 +165,34 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8080",
 ]
 # config/settings.py (al final del archivo)
+CORS_ALLOW_CREDENTIALS = True # <-- Esto ya lo tenías (o deberías)
 
+# --- ¡AÑADE ESTO! ---
+# Lista de headers que tu backend permitirá
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    
+    # Los nuevos headers que añadimos para el caché:
+    'cache-control',
+    'pragma',
+    'expires',
+]
 # Configuración de ASGI para que Django Channels sea el punto de entrada
 ASGI_APPLICATION = 'config.asgi.application'
 
 # Configuración del "Channel Layer" que usará Redis como intermediario
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+   
     },
 }
 # URL donde corre tu App de React (Vite usa el puerto 5173 por defecto)

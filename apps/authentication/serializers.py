@@ -66,6 +66,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
+# apps/authentication/serializers.py
+
+# ... (importaciones) ...
+
 class UserLoginSerializer(serializers.Serializer):
     """
     Serializer para login de usuario - CU-02
@@ -77,18 +81,34 @@ class UserLoginSerializer(serializers.Serializer):
         email = attrs.get('email')
         password = attrs.get('password')
         
-        if email and password:
-            user = authenticate(username=email, password=password)
-            if not user:
-                raise serializers.ValidationError('Credenciales incorrectas')
-            if not user.is_active:
-                raise serializers.ValidationError('Cuenta desactivada')
-            attrs['user'] = user
-        else:
-            raise serializers.ValidationError('Email y contraseña son requeridos')
+        # --- AÑADE ESTAS 3 LÍNEAS PARA DEPURAR ---
+        print("--- INICIANDO VALIDACIÓN ---")
+        print(f"Email recibido: {repr(email)}")
+        print(f"Password recibido: {repr(password)}")
+        # --------------------------------------------
         
+        if not email or not password:
+            raise serializers.ValidationError('Email y contraseña son requeridos')
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            print("--- ERROR: Usuario no encontrado ---") # <-- Añade esto
+            raise serializers.ValidationError('Credenciales incorrectas')
+        
+        if not user.check_password(password):
+            print("--- ERROR: check_password() falló ---") # <-- Añade esto
+            raise serializers.ValidationError('Credenciales incorrectas')
+        
+        if not user.is_active:
+            print("--- ERROR: Usuario no está activo ---") # <-- Añade esto
+            raise serializers.ValidationError('Cuenta desactivada')
+        
+        print("--- VALIDACIÓN EXITOSA ---") # <-- Añade esto
+        attrs['user'] = user
         return attrs
 
+# ... (resto del archivo)
 
 class PasswordResetRequestSerializer(serializers.Serializer):
     """

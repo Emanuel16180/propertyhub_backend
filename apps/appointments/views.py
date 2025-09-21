@@ -203,6 +203,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+# apps/appointments/views.py
+
 class PsychologistAvailabilityViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar disponibilidad de psicólogos
@@ -211,14 +213,21 @@ class PsychologistAvailabilityViewSet(viewsets.ModelViewSet):
     serializer_class = PsychologistAvailabilitySerializer
     permission_classes = [permissions.IsAuthenticated]
     
+    # --- 1. ARREGLO DE PAGINACIÓN ---
+    # Le decimos a esta vista que NO use la paginación de 20 items.
+    pagination_class = None
+    
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Si es psicólogo, solo ve su propia disponibilidad
-        if self.request.user.user_type == 'psychologist':
+        # --- 2. ARREGLO DEL FILTRO DE USUARIO ---
+        # Comparamos con 'professional' (como está en el modelo)
+        # en lugar de 'psychologist'.
+        if self.request.user.user_type == 'professional':
             queryset = queryset.filter(psychologist=self.request.user)
+        # ----------------------------------------
         
-        # Filtro por psicólogo específico
+        # Filtro por psicólogo específico (esto es para el admin, está bien)
         psychologist_id = self.request.query_params.get('psychologist', None)
         if psychologist_id:
             queryset = queryset.filter(psychologist_id=psychologist_id)
@@ -227,7 +236,10 @@ class PsychologistAvailabilityViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Crear disponibilidad (solo psicólogos para sí mismos)"""
+        
+        # --- 3. ARREGLO DE PERMISOS DE CREACIÓN ---
         if request.user.user_type != 'professional':
+        # ------------------------------------------
             return Response(
                 {'error': 'Solo los psicólogos pueden crear disponibilidad'},
                 status=status.HTTP_403_FORBIDDEN
@@ -255,6 +267,7 @@ class PsychologistAvailabilityViewSet(viewsets.ModelViewSet):
         
         return super().update(request, *args, **kwargs)
     
+    # ... (el resto de las funciones @action se quedan igual) ...
     @action(detail=True, methods=['post'])
     def block_date(self, request, pk=None):
         """Bloquear una fecha específica"""

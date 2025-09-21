@@ -1,6 +1,8 @@
 # en apps/users/management/commands/populate_db.py
 
 import random
+# Importamos unicodedata para limpiar los strings
+import unicodedata
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from faker import Faker
@@ -9,6 +11,21 @@ from apps.appointments.models import Appointment
 from datetime import date, timedelta, time
 
 User = get_user_model()
+
+# --- NUEVA FUNCIÓN ---
+def normalize_text(text):
+    """
+    Elimina tildes, diéresis y convierte 'ñ' en 'n'.
+    """
+    # Normaliza a NFD (Canonical Decomposition) para separar letras de acentos
+    text = unicodedata.normalize('NFD', text)
+    # Elimina los caracteres diacríticos (acentos)
+    text = "".join(c for c in text if unicodedata.category(c) != 'Mn')
+    # Convierte 'ñ' a 'n' (ya que la normalización la convierte en n + ~)
+    # Esta función ya lo hace, pero por si acaso, aunque 'Mn' debería cubrir la tilde de la ñ.
+    # El paso anterior es el más efectivo.
+    return text
+
 
 class Command(BaseCommand):
     help = 'Popula la base de datos con datos de prueba (seeders)'
@@ -20,13 +37,24 @@ class Command(BaseCommand):
         # --- 1. Crear Pacientes ---
         patients = []
         for _ in range(50):
-            first_name = fake.first_name()
-            last_name = fake.last_name()
-            email = f"{first_name.lower()}.{last_name.lower()}_{random.randint(1, 1000)}@fakemail.com"
+            # Generamos nombres "sucios"
+            first_name_raw = fake.first_name()
+            last_name_raw = fake.last_name()
+
+            # --- MODIFICACIÓN ---
+            # Limpiamos los nombres
+            first_name = normalize_text(first_name_raw)
+            last_name = normalize_text(last_name_raw)
+            
+            # Creamos el email con los nombres limpios
+            email_user = first_name.lower().replace(' ', '')
+            email_domain = last_name.lower().replace(' ', '')
+            email = f"{email_user}.{email_domain}_{random.randint(1, 1000)}@fakemail.com"
 
             patient, created = User.objects.get_or_create(
                 email=email,
                 defaults={
+                    # Usamos los nombres limpios
                     'username': email.split('@')[0],
                     'first_name': first_name,
                     'last_name': last_name,
@@ -50,13 +78,24 @@ class Command(BaseCommand):
 
         psychologists = []
         for _ in range(10):
-            first_name = fake.first_name()
-            last_name = fake.last_name()
-            email = f"{first_name.lower()}.{last_name.lower()}@psico.com"
+            # Generamos nombres "sucios"
+            first_name_raw = fake.first_name()
+            last_name_raw = fake.last_name()
+
+            # --- MODIFICACIÓN ---
+            # Limpiamos los nombres
+            first_name = normalize_text(first_name_raw)
+            last_name = normalize_text(last_name_raw)
+            
+            # Creamos el email con los nombres limpios
+            email_user = first_name.lower().replace(' ', '')
+            email_domain = last_name.lower().replace(' ', '')
+            email = f"{email_user}.{email_domain}@psico.com"
 
             psy_user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
+                    # Usamos los nombres limpios
                     'username': email.split('@')[0],
                     'first_name': first_name,
                     'last_name': last_name,
@@ -77,7 +116,7 @@ class Command(BaseCommand):
                     experience_years=random.randint(2, 20),
                     consultation_fee=random.choice([150.00, 200.00, 250.00, 300.00]),
                     session_duration=60,
-                    city=fake.city(),
+                    city=fake.city(), # La ciudad puede mantener acentos
                     profile_completed=True
                 )
                 # Asignar especializaciones aleatorias
