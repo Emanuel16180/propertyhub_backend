@@ -310,11 +310,17 @@ class AvailablePsychologistSerializer(serializers.ModelSerializer):
 
 
 class AppointmentUpdateSerializer(serializers.ModelSerializer):
-    """Serializer para actualizar citas (cambiar estado, agregar notas)"""
+    """Serializer para actualizar citas (cambiar estado, agregar notas, reprogramar)"""
     
     class Meta:
         model = Appointment
-        fields = ['status', 'notes', 'meeting_link']
+        fields = [
+            'status', 
+            'notes', 
+            'meeting_link',
+            'appointment_date',  # <- AÑADIDO para reprogramación
+            'start_time'         # <- AÑADIDO para reprogramación
+        ]
     
     def validate_status(self, value):
         # Solo permitir ciertas transiciones de estado

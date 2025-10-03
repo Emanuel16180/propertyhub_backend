@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import ProfessionalProfile, Specialization, WorkingHours
+from .models import ProfessionalProfile, Specialization, WorkingHours, Review
 
 User = get_user_model()
 
@@ -106,3 +106,24 @@ class ProfessionalPublicSerializer(serializers.ModelSerializer):
             'accepts_in_person_sessions', 'city', 'state', 'average_rating',
             'total_reviews', 'specializations', 'working_hours'
         ]
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    """
+    Serializer para crear y mostrar reseñas.
+    """
+    patient_name = serializers.CharField(source='patient.get_full_name', read_only=True)
+
+    class Meta:
+        model = Review
+        fields = [
+            'id', 
+            'professional', 
+            'patient', 
+            'patient_name', 
+            'appointment', 
+            'rating', 
+            'comment', 
+            'created_at'
+        ]
+        read_only_fields = ['patient', 'patient_name', 'professional']

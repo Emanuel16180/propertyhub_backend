@@ -1,18 +1,20 @@
 # apps/professionals/views.py
 
-from rest_framework import status, permissions
+from rest_framework import status, permissions, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from .models import ProfessionalProfile, Specialization
+from .models import ProfessionalProfile, Specialization, Review
 from .serializers import (
     ProfessionalProfileSerializer,
     ProfessionalProfileUpdateSerializer,
     ProfessionalPublicSerializer,
-    SpecializationSerializer
+    SpecializationSerializer,
+    ReviewSerializer
 )
+from apps.appointments.models import Appointment
 
 User = get_user_model()
 
@@ -206,3 +208,66 @@ def list_specializations(request):
     specializations = Specialization.objects.all()
     serializer = SpecializationSerializer(specializations, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CanReviewAppointment(permissions.BasePermission):
+    """
+    Permiso para asegurar que un paciente solo pueda calificar una cita
+    que le pertenece y que ya ha sido completada.
+    """
+    def has_permission(self, request, view):
+        if request.user.user_type != 'patient':
+            return False
+        
+        appointment_id = request.data.get('appointment')
+        try:
+            appointment = Appointment.objects.get(pk=appointment_id)
+            # 1. La cita debe pertenecer al paciente que hace la petición.
+            # 2. El estado de la cita debe ser 'completed'.
+            # 3. La cita no debe tener ya una reseña.
+            return (appointment.patient == request.user and 
+                    appointment.status == 'completed' and 
+                    not hasattr(appointment, 'review'))
+        except Appointment.DoesNotExist:
+            return False
+
+
+class ReviewCreateView(generics.CreateAPIView):
+    """
+    Endpoint para que un paciente cree una reseña para una cita completada.
+    (CU-34)
+    """
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated, CanReviewAppointment]
+
+    def perform_create(self, serializer):
+        appointment = Appointment.objects.get(pk=self.request.data.get('appointment'))
+        # Asignar el paciente y el profesional automáticamente
+        serializer.save(
+            patient=self.request.user, 
+            professional=appointment.psychologist.professional_profile
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def professional_reviews(request, professional_id):
+    """
+    Lista las reseñas de un profesional específico (vista pública)
+    """
+    try:
+        professional = get_object_or_404(ProfessionalProfile, id=professional_id)
+        reviews = Review.objects.filter(professional=professional).order_by('-created_at')
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response({
+            'professional_id': professional_id,
+            'total_reviews': reviews.count(),
+            'average_rating': professional.average_rating,
+            'reviews': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except ProfessionalProfile.DoesNotExist:
+        return Response({
+            'error': 'Profesional no encontrado'
+        }, status=status.HTTP_404_NOT_FOUND)

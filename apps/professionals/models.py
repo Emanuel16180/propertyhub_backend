@@ -3,6 +3,8 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Avg
+from django.conf import settings
 
 User = get_user_model()
 
@@ -83,6 +85,22 @@ class ProfessionalProfile(models.Model):
     def __str__(self):
         return f"Dr. {self.user.get_full_name()}"
 
+    def update_rating(self):
+        """
+        Calcula y actualiza la calificación promedio y el total de reseñas.
+        """
+        reviews = self.reviews.all()
+        self.total_reviews = reviews.count()
+
+        if self.total_reviews > 0:
+            # Calcula el promedio de la columna 'rating'
+            average = reviews.aggregate(Avg('rating'))['rating__avg']
+            self.average_rating = round(average, 2)
+        else:
+            self.average_rating = 0.00
+
+        self.save(update_fields=['average_rating', 'total_reviews'])
+
 
 class WorkingHours(models.Model):
     """
@@ -116,3 +134,58 @@ class WorkingHours(models.Model):
     
     def __str__(self):
         return f"{self.professional} - {self.get_day_of_week_display()}: {self.start_time} - {self.end_time}"
+
+
+class Review(models.Model):
+    """
+    Modelo para una calificación y comentario dejado por un paciente
+    sobre un profesional después de una cita.
+    """
+    professional = models.ForeignKey(
+        ProfessionalProfile,
+        on_delete=models.CASCADE,
+        related_name='reviews'
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reviews_given'
+    )
+    appointment = models.OneToOneField(
+        'appointments.Appointment', # Usamos un string para evitar importación circular
+        on_delete=models.CASCADE,
+        related_name='review',
+        help_text="La cita específica que se está calificando."
+    )
+
+    rating = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'reviews'
+        ordering = ['-created_at']
+        unique_together = ('appointment', 'patient') # Un paciente solo puede calificar una cita una vez
+        verbose_name = 'Reseña'
+        verbose_name_plural = 'Reseñas'
+
+    def __str__(self):
+        return f'Calificación de {self.patient.get_full_name()} para {self.professional.user.get_full_name()}: {self.rating} estrellas'
+
+    def save(self, *args, **kwargs):
+        """
+        Sobrescribimos save para recalcular el rating del profesional.
+        """
+        super().save(*args, **kwargs)
+        # Después de guardar la reseña, actualizamos el perfil del profesional
+        self.professional.update_rating()
+
+    def delete(self, *args, **kwargs):
+        """
+        Sobrescribimos delete para recalcular el rating del profesional.
+        """
+        professional = self.professional
+        super().delete(*args, **kwargs)
+        professional.update_rating()

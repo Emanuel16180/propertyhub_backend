@@ -96,6 +96,25 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
     
+    def update(self, request, *args, **kwargs):
+        """Actualizar cita y devolver objeto completo"""
+        # Llama al método de actualización original para que haga la validación y guardado
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Si el guardado fue exitoso, ahora devolvemos la instancia completa
+        # usando el serializer principal (AppointmentSerializer)
+        
+        # Obtenemos la instancia actualizada de la base de datos
+        instance = self.get_object() 
+        # La serializamos con el serializer completo por defecto
+        full_serializer = AppointmentSerializer(instance) 
+
+        return Response(full_serializer.data)
+    
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
         """Confirmar una cita (solo el psicólogo)"""
@@ -437,8 +456,8 @@ def get_psychologist_schedule(request, psychologist_id):
     Obtener el horario completo de un psicólogo para una semana
     """
     try: # <-- La indentación aquí está corregida
-        # Buscamos el PERFIL PROFESIONAL por su ID, no el ID de usuario
-        profile = ProfessionalProfile.objects.get(id=psychologist_id)
+        # Buscamos el PERFIL PROFESIONAL por el ID del usuario, no por el ID del perfil
+        profile = ProfessionalProfile.objects.get(user_id=psychologist_id)
         psychologist = profile.user
     except ProfessionalProfile.DoesNotExist:
         return Response(

@@ -1,7 +1,7 @@
 # apps/authentication/views.py
 
 from rest_framework import status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, get_user_model
@@ -25,6 +25,7 @@ from .serializers import (
 User = get_user_model()
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def register_user(request):
     serializer = UserRegistrationSerializer(data=request.data)
@@ -45,6 +46,7 @@ def register_user(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def login_user(request):
     serializer = UserLoginSerializer(data=request.data)
@@ -85,6 +87,7 @@ from django.core.mail import send_mail
 
 # --- 2. REEMPLAZA TU VISTA password_reset_request CON ESTA ---
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def password_reset_request(request):
     serializer = PasswordResetRequestSerializer(data=request.data)
@@ -125,6 +128,7 @@ def password_reset_request(request):
 # apps/authentication/views.py
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def password_reset_confirm(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)

@@ -15,4 +15,8 @@ urlpatterns = [
     
     # Especialidades
     path('specializations/', views.list_specializations, name='list_specializations'),
+    
+    # CU-34: Calificar Profesional
+    path('reviews/create/', views.ReviewCreateView.as_view(), name='create-review'),
+    path('<int:professional_id>/reviews/', views.professional_reviews, name='professional-reviews'),
 ]

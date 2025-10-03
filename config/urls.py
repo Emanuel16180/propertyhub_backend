@@ -14,6 +14,7 @@ urlpatterns = [
     path('api/users/', include('apps.users.urls')),              # CU-05
     path('api/professionals/', include('apps.professionals.urls')), # CU-06, CU-08, CU-09, CU-12
     path('api/appointments/', include('apps.appointments.urls')), # CU-10
+    path('api/clinical-history/', include('apps.clinical_history.urls')), # CU-18, CU-39
     
     # API browsable (para desarrollo)
     path('api-auth/', include('rest_framework.urls')),
