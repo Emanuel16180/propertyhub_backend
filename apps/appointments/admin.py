@@ -17,9 +17,9 @@ class PsychologistAvailabilityAdmin(admin.ModelAdmin):
         return obj.get_weekday_display()
     get_weekday_display.short_description = 'Día de la Semana'
 
-# Registrar en el admin site por defecto para tenants
-admin.site.register(Appointment, AppointmentAdmin)
-admin.site.register(PsychologistAvailability, PsychologistAvailabilityAdmin)
+# NO registrar en el admin por defecto - se registran en admin sites específicos
+# admin.site.register(Appointment, AppointmentAdmin)
+# admin.site.register(PsychologistAvailability, PsychologistAvailabilityAdmin)
 
 # Registrar también en el tenant admin
 from config.tenant_admin import tenant_admin_site

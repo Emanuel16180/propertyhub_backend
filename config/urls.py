@@ -4,7 +4,7 @@
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
+from config.admin_site import tenant_admin_site
 from test_view import test_tenant
 from tenant_debug import tenant_debug
 
@@ -15,8 +15,8 @@ urlpatterns = [
     # Vista de prueba
     path('test/', test_tenant, name='test_tenant'),
     
-    # Admin DEFAULT de Django para cada clínica individual
-    path('admin/', admin.site.urls),
+    # Admin ESPECÍFICO para tenants (sin gestión de clínicas)
+    path('admin/', tenant_admin_site.urls),
 
     # Todas las rutas de la API se quedan como están
     path('api/auth/', include('apps.authentication.urls')),      # CU-01, CU-02, CU-03, CU-04

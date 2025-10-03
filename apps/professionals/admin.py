@@ -21,11 +21,11 @@ class ReviewAdmin(admin.ModelAdmin):
     search_fields = ('patient__first_name', 'patient__last_name', 'professional__user__first_name', 'professional__user__last_name')
     readonly_fields = ('created_at',)
 
-# Registrar en el admin site por defecto para tenants
-admin.site.register(ProfessionalProfile, ProfessionalProfileAdmin)
-admin.site.register(Specialization, SpecializationAdmin)
-admin.site.register(WorkingHours)
-admin.site.register(Review, ReviewAdmin)
+# NO registrar en el admin por defecto - se registran en admin sites específicos
+# admin.site.register(ProfessionalProfile, ProfessionalProfileAdmin)
+# admin.site.register(Specialization, SpecializationAdmin)
+# admin.site.register(WorkingHours)
+# admin.site.register(Review, ReviewAdmin)
 
 # Registrar también en el tenant admin
 from config.tenant_admin import tenant_admin_site

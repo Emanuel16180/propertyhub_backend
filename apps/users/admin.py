@@ -86,9 +86,9 @@ class PatientProfileAdmin(admin.ModelAdmin):
     readonly_fields = ('profile_completed',)
 
 # Registrar los modelos en el admin por defecto
-# Registrar en el admin site por defecto para tenants
-admin.site.register(CustomUser, CustomUserAdmin)
-admin.site.register(PatientProfile, PatientProfileAdmin)
+# NO registrar en el admin por defecto - se registran en admin sites específicos
+# admin.site.register(CustomUser, CustomUserAdmin)
+# admin.site.register(PatientProfile, PatientProfileAdmin)
 
 # Registrar también en el tenant admin
 from config.tenant_admin import tenant_admin_site

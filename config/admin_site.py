@@ -4,19 +4,6 @@ from django.contrib import admin
 from apps.tenants.models import Clinic, Domain, PublicUser
 from apps.tenants.forms import PublicAdminAuthenticationForm
 
-# Importar modelos y admins de todas las apps
-from apps.users.models import CustomUser, PatientProfile
-from apps.users.admin import CustomUserAdmin, PatientProfileAdmin
-
-from apps.professionals.models import ProfessionalProfile, Specialization, WorkingHours, Review
-from apps.professionals.admin import ProfessionalProfileAdmin, SpecializationAdmin, ReviewAdmin
-
-from apps.appointments.models import Appointment, PsychologistAvailability
-from apps.appointments.admin import AppointmentAdmin, PsychologistAvailabilityAdmin
-
-from apps.chat.models import ChatMessage
-from apps.chat.admin import ChatMessageAdmin
-
 class PublicAdminSite(admin.AdminSite):
     """
     Admin site personalizado para el esquema público.
@@ -28,25 +15,36 @@ class PublicAdminSite(admin.AdminSite):
     
     # Le decimos que use nuestro formulario de login personalizado
     login_form = PublicAdminAuthenticationForm
+
+class TenantAdminSite(admin.AdminSite):
+    """
+    Admin site específico para tenants individuales (clínicas).
+    Muestra todas las funcionalidades normales de Django admin
+    para gestionar usuarios, citas, chats, etc.
+    SIN mostrar gestión de clínicas.
+    """
+    site_header = "Administración de Clínica"
+    site_title = "Admin Clínica" 
+    index_title = "Panel de Control"
     
-    def get_app_list(self, request, app_label=None):
+    def each_context(self, request):
         """
-        Personalizar la lista de apps mostradas - solo mostrar tenants
+        Personalizar el contexto para mostrar información del tenant actual
         """
-        app_list = super().get_app_list(request, app_label)
+        context = super().each_context(request)
         
-        # Filtrar solo las apps que queremos mostrar
-        filtered_apps = []
-        for app in app_list:
-            if app['app_label'] in ['tenants']:
-                filtered_apps.append(app)
+        # Intentar obtener información del tenant actual
+        if hasattr(request, 'tenant'):
+            context['tenant_name'] = getattr(request.tenant, 'name', 'Clínica')
+            context['site_header'] = f"Administración de {context['tenant_name']}"
         
-        return filtered_apps
+        return context
 
-# Instancia única de nuestro admin público
+# Instancias de los admin sites
 public_admin_site = PublicAdminSite(name='public_admin')
+tenant_admin_site = TenantAdminSite(name='tenant_admin')
 
-# --- ADMIN CLASSES ---
+# --- ADMIN CLASSES PARA PÚBLICO ---
 
 class ClinicAdmin(admin.ModelAdmin):
     """Admin para gestionar clínicas"""
@@ -70,53 +68,32 @@ class PublicUserAdmin(admin.ModelAdmin):
     
     fields = ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 'is_superuser')
 
-# --- ADMIN SITE PARA TENANTS ---
-
-class TenantAdminSite(admin.AdminSite):
-    """
-    Admin site específico para tenants individuales (clínicas).
-    Muestra todas las funcionalidades normales de Django admin
-    para gestionar usuarios, citas, chats, etc.
-    """
-    site_header = "Administración de Clínica"
-    site_title = "Admin Clínica" 
-    index_title = "Panel de Control"
-    
-    def each_context(self, request):
-        """
-        Personalizar el contexto para mostrar información del tenant actual
-        """
-        context = super().each_context(request)
-        
-        # Intentar obtener información del tenant actual
-        if hasattr(request, 'tenant'):
-            context['tenant_name'] = getattr(request.tenant, 'name', 'Clínica')
-            context['site_header'] = f"Administración de {context['tenant_name']}"
-        
-        return context
-
-# Instancia del admin para tenants
-tenant_admin_site = TenantAdminSite(name='tenant_admin')
-
-# --- REGISTRAR MODELOS EN ADMIN PÚBLICO ---
+# --- REGISTRAR MODELOS SOLO EN ADMIN PÚBLICO ---
 public_admin_site.register(Clinic, ClinicAdmin)
 public_admin_site.register(Domain, DomainAdmin)
 public_admin_site.register(PublicUser, PublicUserAdmin)
 
-# --- REGISTRAR MODELOS EN ADMIN DE TENANTS ---
-# Users app
+# --- REGISTRAR MODELOS SOLO EN ADMIN DE TENANTS ---
+# Importar modelos y admins de tenants
+from apps.users.models import CustomUser, PatientProfile
+from apps.users.admin import CustomUserAdmin, PatientProfileAdmin
+
+from apps.professionals.models import ProfessionalProfile, Specialization, WorkingHours, Review
+from apps.professionals.admin import ProfessionalProfileAdmin, SpecializationAdmin, ReviewAdmin
+
+from apps.appointments.models import Appointment, PsychologistAvailability
+from apps.appointments.admin import AppointmentAdmin, PsychologistAvailabilityAdmin
+
+from apps.chat.models import ChatMessage
+from apps.chat.admin import ChatMessageAdmin
+
+# Registrar SOLO en el admin de tenants
 tenant_admin_site.register(CustomUser, CustomUserAdmin)
 tenant_admin_site.register(PatientProfile, PatientProfileAdmin)
-
-# Professionals app
 tenant_admin_site.register(ProfessionalProfile, ProfessionalProfileAdmin)
 tenant_admin_site.register(Specialization, SpecializationAdmin)
 tenant_admin_site.register(WorkingHours)
 tenant_admin_site.register(Review, ReviewAdmin)
-
-# Appointments app
 tenant_admin_site.register(Appointment, AppointmentAdmin)
 tenant_admin_site.register(PsychologistAvailability, PsychologistAvailabilityAdmin)
-
-# Chat app
 tenant_admin_site.register(ChatMessage, ChatMessageAdmin)

@@ -11,8 +11,8 @@ class ChatMessageAdmin(admin.ModelAdmin):
         return obj.message[:50] + "..." if len(obj.message) > 50 else obj.message
     message_preview.short_description = 'Mensaje'
 
-# Registrar en el admin site por defecto para tenants
-admin.site.register(ChatMessage, ChatMessageAdmin)
+# NO registrar en el admin por defecto - se registran en admin sites específicos
+# admin.site.register(ChatMessage, ChatMessageAdmin)
 
 # Registrar también en el tenant admin
 from config.tenant_admin import tenant_admin_site

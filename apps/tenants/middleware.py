@@ -1,30 +1,29 @@
 # apps/tenants/middleware.py
 
-from django.contrib import admin
 from django.db import connection
+from django.conf import settings
+from django.urls import clear_url_caches
+from django.utils.deprecation import MiddlewareMixin
 
-class TenantAdminTitleMiddleware:
+class TenantAdminTitleMiddleware(MiddlewareMixin):
     """
-    Middleware que modifica los títulos del admin según el tenant actual
+    Middleware que fuerza el cambio de URLconf según el tenant
+    Ya no necesita modificar títulos porque tenemos admin sites separados
     """
     
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        # Modificar títulos según el tenant antes de procesar la request
+    def process_request(self, request):
+        """
+        Procesar request ANTES de que llegue a las views
+        """
+        # Verificar si tenemos un tenant y forzar URLconf si es necesario
         if hasattr(connection, 'tenant') and connection.tenant:
             if connection.tenant.schema_name == 'public':
-                # Títulos para el admin público
-                admin.site.site_header = "Administración Global de Psico SAS"
-                admin.site.site_title = "Admin Global"
-                admin.site.index_title = "Gestión de Clínicas"
+                # Para tenant público: usar ROOT_URLCONF
+                request.urlconf = settings.ROOT_URLCONF
+                clear_url_caches()
             else:
-                # Títulos para admins de tenants
-                tenant_name = getattr(connection.tenant, 'name', 'Clínica')
-                admin.site.site_header = f"Administración de {tenant_name}"
-                admin.site.site_title = "Admin Clínica"
-                admin.site.index_title = "Panel de Control"
+                # Para tenants individuales: usar TENANT_URLCONF
+                request.urlconf = settings.TENANT_URLCONF
+                clear_url_caches()
         
-        response = self.get_response(request)
-        return response
+        return None
