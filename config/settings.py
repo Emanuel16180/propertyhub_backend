@@ -31,29 +31,50 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=Csv())
 
 # Application definition
 
-INSTALLED_APPS = [
-    'channels',
-    'django.contrib.admin',
-    'django.contrib.auth',
+# --- APLICACIONES COMPARTIDAS ---
+# Estas apps viven en el esquema "public" y son visibles para todos.
+SHARED_APPS = (
+    'django_tenants',  # Componente principal de django-tenants
     'django.contrib.contenttypes',
+    
+    # Crea una nueva app para gestionar las clínicas (la crearemos en el siguiente paso)
+    'apps.tenants', 
+
+    # El resto de las apps de Django que necesitas en el lado público
+    'django.contrib.auth',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'rest_framework',
-    'rest_framework.authtoken',  # Para autenticación por token
-    'corsheaders', 
+    'corsheaders',
+    'channels',  # Para WebSocket
+)
 
-    'apps.authentication',
+# --- APLICACIONES DEL INQUILINO (TENANT) ---
+# Estas son las apps específicas de cada clínica.
+TENANT_APPS = (
+    # Admin específico de cada clínica
+    'django.contrib.admin',
+    
+    # Token auth específico de cada clínica
+    'rest_framework.authtoken',
+    
+    # Todas tus apps funcionales van aquí
     'apps.users',
+    'apps.authentication',
     'apps.professionals',
     'apps.appointments',
     'apps.chat',
-    'apps.clinical_history',  # <- NUEVA APP para historial clínico
-]
+    'apps.clinical_history',
+)
+
+# --- CONFIGURACIÓN FINAL DE INSTALLED_APPS ---
+# Django usará esta lista combinada.
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 MIDDLEWARE = [
-     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  
@@ -64,7 +85,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'config.urls'
+# Configuración de URLs para django-tenants
+ROOT_URLCONF = 'config.urls_public'  # Para el tenant público (localhost)
+TENANT_URLCONF = 'config.urls'       # Para los tenants de clínicas (bienestar.localhost, mindcare.localhost)
 
 TEMPLATES = [
     {
@@ -88,8 +111,26 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": dj_database_url.config(default=config("DATABASE_URL"))
+    "default": dj_database_url.config(
+        default=config("DATABASE_URL"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
+
+# Configurar el backend específico para django-tenants
+DATABASES['default']['ENGINE'] = 'django_tenants.postgresql_backend'
+
+# --- CONFIGURACIÓN DE DJANGO-TENANTS ---
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
+
+# Modelo que representa a cada inquilino (clínica)
+TENANT_MODEL = "tenants.Clinic"
+
+# URL del esquema público (donde vivirá la gestión de clínicas)
+TENANT_DOMAIN_MODEL = "tenants.Domain"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -146,6 +187,12 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.CustomUser'
+
+# Backend de autenticación personalizado para multi-tenant
+AUTHENTICATION_BACKENDS = [
+    'apps.tenants.auth_backends.TenantAwareAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # Django REST Framework configuration
 REST_FRAMEWORK = {
