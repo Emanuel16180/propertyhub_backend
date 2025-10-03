@@ -211,12 +211,13 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "https://psico-admin-sp1-despliegue-front.vercel.app",
-    "http://localhost:3000",      # Puerto común para React
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",      # Añade la URL de Vite aquí
-    "http://127.0.0.1:5173",
-    "http://localhost:8080",      
-    "http://127.0.0.1:8080",
+]
+
+# Permitir cualquier subdominio de localhost y cualquier puerto
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://\\w+\\.localhost:\\d+$",  # Permite http://<cualquier-cosa>.localhost:<cualquier-puerto>
+    r"^http://localhost:\\d+$",           # Permite http://localhost:<cualquier-puerto>
+    r"^http://127\\.0\\.0\\.1:\\d+$", # Permite http://127.0.0.1:<cualquier-puerto>
 ]
 # config/settings.py (al final del archivo)
 CORS_ALLOW_CREDENTIALS = True # <-- Esto ya lo tenías (o deberías)
