@@ -32,34 +32,31 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=Csv())
 # Application definition
 
 # --- APLICACIONES COMPARTIDAS ---
-# Estas apps viven en el esquema "public" y son visibles para todos.
+# Solo lo absolutamente esencial que es global para todas las clínicas.
 SHARED_APPS = (
     'django_tenants',  # Componente principal de django-tenants
+    'apps.tenants',    # App para gestionar las clínicas
     'django.contrib.contenttypes',
-    
-    # Crea una nueva app para gestionar las clínicas (la crearemos en el siguiente paso)
-    'apps.tenants', 
-
-    # El resto de las apps de Django que necesitas en el lado público
-    'django.contrib.auth',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',
     'corsheaders',
     'channels',  # Para WebSocket
 )
 
 # --- APLICACIONES DEL INQUILINO (TENANT) ---
-# Estas son las apps específicas de cada clínica.
+# Todo lo que una clínica individual necesita.
 TENANT_APPS = (
-    # Admin específico de cada clínica
+    # Apps de Django que necesita cada clínica
     'django.contrib.admin',
-    
-    # Token auth específico de cada clínica
+    'django.contrib.auth',
+    'django.contrib.contenttypes',  # También necesario en tenants
+    'django.contrib.sessions',      # También necesario en tenants  
+    'django.contrib.messages',      # También necesario en tenants
+    'rest_framework',
     'rest_framework.authtoken',
     
-    # Todas tus apps funcionales van aquí
+    # Todas tus apps funcionales
     'apps.users',
     'apps.authentication',
     'apps.professionals',
@@ -74,6 +71,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
+    'apps.tenants.middleware.TenantAdminTitleMiddleware',   # Nuestro middleware personalizado
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

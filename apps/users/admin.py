@@ -85,9 +85,15 @@ class PatientProfileAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('profile_completed',)
 
-# Registrar los modelos
+# Registrar los modelos en el admin por defecto
+# Registrar en el admin site por defecto para tenants
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(PatientProfile, PatientProfileAdmin)
+
+# Registrar también en el tenant admin
+from config.tenant_admin import tenant_admin_site
+tenant_admin_site.register(CustomUser, CustomUserAdmin)
+tenant_admin_site.register(PatientProfile, PatientProfileAdmin)
 
 # Personalizar títulos del admin
 admin.site.site_header = "Centro de Salud Mental - Administración"

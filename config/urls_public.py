@@ -1,9 +1,11 @@
 # config/urls_public.py
-# Rutas para el tenant público (gestión de clínicas)
+# Rutas para el tenant público (admin de tenants)
 
-from django.contrib import admin
 from django.urls import path
+from config.admin_site import public_admin_site
+from tenant_debug import tenant_debug
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/', public_admin_site.urls),
+    path('debug/', tenant_debug, name='tenant_debug_public'),
 ]
