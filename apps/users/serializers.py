@@ -7,6 +7,11 @@ from datetime import date
 
 User = get_user_model()
 
+# Importar serializer de perfil profesional para evitar importación circular
+def get_professional_profile_serializer():
+    from apps.professionals.serializers import ProfessionalProfileSerializer
+    return ProfessionalProfileSerializer
+
 class UserProfileSerializer(serializers.ModelSerializer):
     """
     Serializer para actualizar perfil básico del usuario - CU-05
@@ -62,6 +67,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
     Serializer para mostrar información completa del usuario - CU-05
     """
     patient_profile = PatientProfileSerializer(read_only=True)
+    professional_profile = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     age = serializers.ReadOnlyField()
     
@@ -72,7 +78,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'full_name', 'user_type', 'ci', 'phone', 'gender',
             'address', 'date_of_birth', 'age', 'profile_picture', 
             'is_verified', 'is_active_patient', 'date_joined', 
-            'patient_profile'
+            'patient_profile', 'professional_profile'
         )
         read_only_fields = (
             'id', 'email', 'username', 'user_type', 'is_verified', 
@@ -81,6 +87,13 @@ class UserDetailSerializer(serializers.ModelSerializer):
     
     def get_full_name(self, obj):
         return obj.get_full_name()
+    
+    def get_professional_profile(self, obj):
+        """Retorna el perfil profesional si el usuario es un profesional"""
+        if obj.user_type == 'professional' and hasattr(obj, 'professional_profile'):
+            ProfessionalProfileSerializer = get_professional_profile_serializer()
+            return ProfessionalProfileSerializer(obj.professional_profile).data
+        return None
 
 
 class PatientRegistrationSerializer(serializers.ModelSerializer):
