@@ -1,4 +1,10 @@
-# 🚀 CONFIGURACIÓN FRONTEND - SISTEMA MULTI-TENANT
+# 🚀 CONFIG### 🏢 **Administrador General** (Esquema Público)
+- **URL**: `http://localhost:8000`
+- **Admin Web**: `http://localhost:8000/admin/` ✅
+- **Credenciales**: `admin@psico.com` / `admin`
+- **Función**: Gestiona clínicas y configuración global del sistema
+- **Autenticación**: Solo via interfaz web de Django Admin (no API)
+- **Uso**: Acceso directo al admin panel, no requiere tokensN FRONTEND - SISTEMA MULTI-TENANT
 
 ## ✅ ESTADO ACTUAL
 - **Backend corriendo**: `http://127.0.0.1:8000`
@@ -9,7 +15,14 @@
 
 ## 🌐 DOMINIOS DISPONIBLES
 
-### 🏥 Tenant: Bienestar
+### � **Administrador General** (Esquema Público)
+- **URL**: `http://localhost:8000`
+- **Admin**: `http://localhost:8000/admin/`
+- **API Base**: `http://localhost:8000/api/`
+- **Credenciales**: `admin@psico.com` / `admin`
+- **Función**: Gestiona clínicas y configuración global del sistema
+
+### �🏥 Tenant: Bienestar
 - **URL**: `http://bienestar.localhost:8000`
 - **Admin**: `http://bienestar.localhost:8000/admin/`
 - **API Base**: `http://bienestar.localhost:8000/api/`
@@ -43,6 +56,28 @@ const response = await fetch('http://bienestar.localhost:8000/api/auth/login/', 
 });
 ```
 
+## � ARQUITECTURA DE AUTENTICACIÓN
+
+### 🏢 **Administrador Global (localhost:8000)**
+- **Tipo**: Autenticación por sesiones Django
+- **Modelo**: `PublicUser` 
+- **Acceso**: Solo via Django Admin web interface
+- **Credenciales**: `admin@psico.com` / `admin`
+- **URL**: `http://localhost:8000/admin/`
+
+### 🏥 **Clínicas (subdominios)**
+- **Tipo**: Autenticación por tokens REST API
+- **Modelo**: `CustomUser`
+- **Acceso**: API endpoints con tokens JWT/DRF
+- **Credenciales**: `admin@gmail.com` / `admin`
+- **URLs API**: 
+  - `http://bienestar.localhost:8000/api/auth/login/`
+  - `http://mindcare.localhost:8000/api/auth/login/`
+
+### ⚠️ **Separación Importante**
+- **localhost:8000**: NO tiene endpoints `/api/auth/` (solo admin web)
+- **subdominios**: SÍ tienen endpoints `/api/auth/` (para frontend)
+
 ## 🔒 CONFIGURACIÓN CORS
 
 ### ✅ Orígenes Permitidos
@@ -73,14 +108,18 @@ const response = await fetch('http://bienestar.localhost:8000/api/auth/login/', 
 ### Para React/Vite:
 ```javascript
 // .env.local
+VITE_API_BASE_URL_PUBLIC=http://localhost:8000
 VITE_API_BASE_URL_BIENESTAR=http://bienestar.localhost:8000
 VITE_API_BASE_URL_MINDCARE=http://mindcare.localhost:8000
 
 // utils/api.js
 const getApiBaseUrl = (tenant) => {
-  return tenant === 'bienestar' 
-    ? import.meta.env.VITE_API_BASE_URL_BIENESTAR
-    : import.meta.env.VITE_API_BASE_URL_MINDCARE;
+  switch(tenant) {
+    case 'public': return import.meta.env.VITE_API_BASE_URL_PUBLIC;
+    case 'bienestar': return import.meta.env.VITE_API_BASE_URL_BIENESTAR;
+    case 'mindcare': return import.meta.env.VITE_API_BASE_URL_MINDCARE;
+    default: return import.meta.env.VITE_API_BASE_URL_PUBLIC;
+  }
 };
 
 export const apiCall = async (tenant, endpoint, options = {}) => {
