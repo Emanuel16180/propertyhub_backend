@@ -7,10 +7,12 @@ from django.conf.urls.static import static
 from config.admin_site import tenant_admin_site
 from test_view import test_tenant
 from tenant_debug import tenant_debug
+from admin_debug import admin_debug
 
 urlpatterns = [
     # Vista de diagnóstico
     path('debug/', tenant_debug, name='tenant_debug'),
+    path('admin-debug/', admin_debug, name='admin_debug'),
     
     # Vista de prueba
     path('test/', test_tenant, name='test_tenant'),
@@ -24,6 +26,7 @@ urlpatterns = [
     path('api/professionals/', include('apps.professionals.urls')), # CU-06, CU-08, CU-09, CU-12
     path('api/appointments/', include('apps.appointments.urls')), # CU-10
     path('api/clinical-history/', include('apps.clinical_history.urls')), # CU-18, CU-39
+    path('api/admin/', include('apps.clinic_admin.urls')),  # CU-30, CU-07 gestión interna de usuarios y verificación
     
     # API browsable (para desarrollo)
     path('api-auth/', include('rest_framework.urls')),

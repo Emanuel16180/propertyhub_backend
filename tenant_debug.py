@@ -24,15 +24,29 @@ def tenant_debug(request):
         else:
             tenant_info['tenant_name'] = 'NO TENANT OBJECT'
             
-        # Verificar qué URLs están disponibles
+        # Información detallada del URLconf
+        from django.conf import settings
+        tenant_info['root_urlconf_setting'] = settings.ROOT_URLCONF
+        tenant_info['tenant_urlconf_setting'] = getattr(settings, 'TENANT_URLCONF', 'Not set')
+        
+        # Verificar URLconf del request
+        tenant_info['request_urlconf'] = getattr(request, 'urlconf', 'Not set')
+        
+        # Verificar resolver actual
         from django.urls import get_resolver
+        resolver = get_resolver()
+        tenant_info['resolver_urlconf'] = getattr(resolver, 'urlconf_name', 'Not set')
+            
+        # Verificar qué URLs están disponibles
         resolver = get_resolver()
         
         available_urls = []
-        for pattern in resolver.url_patterns[:5]:  # Solo los primeros 5
+        for pattern in resolver.url_patterns[:10]:  # Los primeros 10 para ver más
             available_urls.append(str(pattern.pattern))
             
         tenant_info['available_urls'] = available_urls
+        tenant_info['current_urlconf'] = settings.ROOT_URLCONF if hasattr(settings, 'ROOT_URLCONF') else 'None'
+        tenant_info['tenant_urlconf'] = settings.TENANT_URLCONF if hasattr(settings, 'TENANT_URLCONF') else 'None'
         
         # Verificar si estamos en public o tenant schema
         if connection.schema_name == 'public':

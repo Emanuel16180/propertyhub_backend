@@ -49,7 +49,7 @@ def register_user(request):
 @authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def login_user(request):
-    serializer = UserLoginSerializer(data=request.data)
+    serializer = UserLoginSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         user = serializer.validated_data['user']
         token, created = Token.objects.get_or_create(user=user)

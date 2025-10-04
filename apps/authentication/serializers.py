@@ -81,30 +81,21 @@ class UserLoginSerializer(serializers.Serializer):
         email = attrs.get('email')
         password = attrs.get('password')
         
-        # --- AÑADE ESTAS 3 LÍNEAS PARA DEPURAR ---
-        print("--- INICIANDO VALIDACIÓN ---")
-        print(f"Email recibido: {repr(email)}")
-        print(f"Password recibido: {repr(password)}")
-        # --------------------------------------------
-        
         if not email or not password:
             raise serializers.ValidationError('Email y contraseña son requeridos')
 
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            print("--- ERROR: Usuario no encontrado ---") # <-- Añade esto
-            raise serializers.ValidationError('Credenciales incorrectas')
-        
-        if not user.check_password(password):
-            print("--- ERROR: check_password() falló ---") # <-- Añade esto
-            raise serializers.ValidationError('Credenciales incorrectas')
-        
-        if not user.is_active:
-            print("--- ERROR: Usuario no está activo ---") # <-- Añade esto
-            raise serializers.ValidationError('Cuenta desactivada')
-        
-        print("--- VALIDACIÓN EXITOSA ---") # <-- Añade esto
+        # --- LÍNEAS CLAVE CORREGIDAS ---
+        # El backend TenantAwareAuthBackend DEBE encargarse de buscar el usuario
+        # en el modelo (PublicUser o CustomUser) correcto.
+        # Necesitamos obtener el request del contexto del serializer
+        request = self.context.get('request')
+        user = authenticate(request=request, username=email, password=password)
+
+        # Si 'authenticate' falla, es por credenciales inválidas o usuario inactivo.
+        if not user or not user.is_active:
+            raise serializers.ValidationError("Credenciales inválidas o usuario inactivo.")
+        # --- FIN LÍNEAS CLAVE CORREGIDAS ---
+
         attrs['user'] = user
         return attrs
 

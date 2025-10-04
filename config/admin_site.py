@@ -73,27 +73,56 @@ public_admin_site.register(Clinic, ClinicAdmin)
 public_admin_site.register(Domain, DomainAdmin)
 public_admin_site.register(PublicUser, PublicUserAdmin)
 
-# --- REGISTRAR MODELOS SOLO EN ADMIN DE TENANTS ---
-# Importar modelos y admins de tenants
-from apps.users.models import CustomUser, PatientProfile
-from apps.users.admin import CustomUserAdmin, PatientProfileAdmin
+# --- REGISTRAR MODELOS EN ADMIN DE TENANTS ---
+# Importar y registrar todos los modelos de las apps de tenants
 
-from apps.professionals.models import ProfessionalProfile, Specialization, WorkingHours, Review
-from apps.professionals.admin import ProfessionalProfileAdmin, SpecializationAdmin, ReviewAdmin
+# 1. Usuarios y Perfiles
+try:
+    from apps.users.models import CustomUser, PatientProfile
+    from apps.users.admin import CustomUserAdmin, PatientProfileAdmin
+    tenant_admin_site.register(CustomUser, CustomUserAdmin)
+    tenant_admin_site.register(PatientProfile, PatientProfileAdmin)
+except ImportError:
+    pass
 
-from apps.appointments.models import Appointment, PsychologistAvailability
-from apps.appointments.admin import AppointmentAdmin, PsychologistAvailabilityAdmin
+# 2. Profesionales
+try:
+    from apps.professionals.models import ProfessionalProfile, Specialization, WorkingHours, Review
+    from apps.professionals.admin import ProfessionalProfileAdmin, SpecializationAdmin, ReviewAdmin
+    tenant_admin_site.register(ProfessionalProfile, ProfessionalProfileAdmin)
+    tenant_admin_site.register(Specialization, SpecializationAdmin)
+    tenant_admin_site.register(WorkingHours)  # Sin admin personalizado
+    tenant_admin_site.register(Review, ReviewAdmin)
+except ImportError:
+    pass
 
-from apps.chat.models import ChatMessage
-from apps.chat.admin import ChatMessageAdmin
+# 3. Citas
+try:
+    from apps.appointments.models import Appointment, PsychologistAvailability
+    from apps.appointments.admin import AppointmentAdmin, PsychologistAvailabilityAdmin
+    tenant_admin_site.register(Appointment, AppointmentAdmin)
+    tenant_admin_site.register(PsychologistAvailability, PsychologistAvailabilityAdmin)
+except ImportError:
+    pass
 
-# Registrar SOLO en el admin de tenants
-tenant_admin_site.register(CustomUser, CustomUserAdmin)
-tenant_admin_site.register(PatientProfile, PatientProfileAdmin)
-tenant_admin_site.register(ProfessionalProfile, ProfessionalProfileAdmin)
-tenant_admin_site.register(Specialization, SpecializationAdmin)
-tenant_admin_site.register(WorkingHours)
-tenant_admin_site.register(Review, ReviewAdmin)
-tenant_admin_site.register(Appointment, AppointmentAdmin)
-tenant_admin_site.register(PsychologistAvailability, PsychologistAvailabilityAdmin)
-tenant_admin_site.register(ChatMessage, ChatMessageAdmin)
+# 4. Chat
+try:
+    from apps.chat.models import ChatMessage
+    from apps.chat.admin import ChatMessageAdmin
+    # ChatMessage ya se registra en su propio admin.py, pero lo agregamos aquí también
+    if not tenant_admin_site.is_registered(ChatMessage):
+        tenant_admin_site.register(ChatMessage, ChatMessageAdmin)
+except ImportError:
+    pass
+
+# 5. Historia Clínica
+try:
+    from apps.clinical_history.models import SessionNote, ClinicalDocument
+    from apps.clinical_history.admin import SessionNoteAdmin, ClinicalDocumentAdmin
+    # Estos modelos ya se registran en su admin.py, pero los agregamos al tenant admin
+    if not tenant_admin_site.is_registered(SessionNote):
+        tenant_admin_site.register(SessionNote, SessionNoteAdmin)
+    if not tenant_admin_site.is_registered(ClinicalDocument):
+        tenant_admin_site.register(ClinicalDocument, ClinicalDocumentAdmin)
+except ImportError:
+    pass

@@ -27,7 +27,7 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", default=False, cast=bool)
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=Csv())
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,bienestar.localhost,mindcare.localhost,*.localhost,*.127.0.0.1.nip.io", cast=Csv())
 
 # Application definition
 
@@ -63,6 +63,7 @@ TENANT_APPS = (
     'apps.appointments',
     'apps.chat',
     'apps.clinical_history',
+    'apps.clinic_admin',  # Administración interna de la clínica (CU-30, CU-07)
 )
 
 # --- CONFIGURACIÓN FINAL DE INSTALLED_APPS ---
@@ -71,7 +72,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
-    'apps.tenants.middleware.TenantAdminTitleMiddleware',   # Nuestro middleware personalizado
+    'fix_tenant_middleware.FixTenantURLConfMiddleware',  # Fuerza URLconf correcto
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -189,7 +190,7 @@ AUTH_USER_MODEL = 'users.CustomUser'
 # Backend de autenticación personalizado para multi-tenant
 AUTHENTICATION_BACKENDS = [
     'apps.tenants.auth_backends.TenantAwareAuthBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    # No incluir ModelBackend estándar ya que TenantAwareAuthBackend lo reemplaza
 ]
 
 # Django REST Framework configuration
@@ -209,21 +210,38 @@ REST_FRAMEWORK = {
     ]
 }
 
+# URLs de producción y desarrollo
 CORS_ALLOWED_ORIGINS = [
     "https://psico-admin-sp1-despliegue-front.vercel.app",
+    # Puertos locales comunes para desarrollo
+    "http://localhost:3000",      # React (Create React App)
+    "http://localhost:5173",      # Vite
+    "http://localhost:5174",      # Vite (puerto alternativo)
+    "http://localhost:8080",      # Vue/webpack
+    "http://localhost:4200",      # Angular
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    # Subdominios específicos para desarrollo
+    "http://bienestar.localhost:5174",
+    "http://mindcare.localhost:5174",
+    "http://bienestar.localhost:3000",
+    "http://mindcare.localhost:3000",
+    "http://bienestar.localhost:5173",
+    "http://mindcare.localhost:5173",
 ]
 
-# Permitir cualquier subdominio de localhost y cualquier puerto
+# Patrones regex para permitir cualquier subdominio localhost
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://\\w+\\.localhost:\\d+$",  # Permite http://<cualquier-cosa>.localhost:<cualquier-puerto>
-    r"^http://localhost:\\d+$",           # Permite http://localhost:<cualquier-puerto>
-    r"^http://127\\.0\\.0\\.1:\\d+$", # Permite http://127.0.0.1:<cualquier-puerto>
+    r"^http://\w+\.localhost:\d+$",     # Permite http://<cualquier-cosa>.localhost:<puerto>
+    r"^http://localhost:\d+$",          # Permite http://localhost:<puerto>
+    r"^http://127\.0\.0\.1:\d+$",       # Permite http://127.0.0.1:<puerto>
+    r"^https://\w+\.localhost:\d+$",    # Permite https://<cualquier-cosa>.localhost:<puerto>
 ]
-# config/settings.py (al final del archivo)
-CORS_ALLOW_CREDENTIALS = True # <-- Esto ya lo tenías (o deberías)
+# Asegúrate de que esta línea también esté presente
+CORS_ALLOW_CREDENTIALS = True
 
-# --- ¡AÑADE ESTO! ---
-# Lista de headers que tu backend permitirá
+# Headers permitidos para las solicitudes CORS
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -234,11 +252,22 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    
-    # Los nuevos headers que añadimos para el caché:
     'cache-control',
     'pragma',
     'expires',
+    # Headers adicionales para APIs
+    'x-api-key',
+    'x-client-type',
+]
+
+# Métodos HTTP permitidos
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
 ]
 # Configuración de ASGI para que Django Channels sea el punto de entrada
 ASGI_APPLICATION = 'config.asgi.application'
