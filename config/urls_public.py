@@ -3,11 +3,18 @@
 
 from django.urls import path, include  
 from config.admin_site import public_admin_site
-from tenant_debug import tenant_debug
 
 urlpatterns = [
+    # Admin público para gestión de clínicas/tenants
     path('admin/', public_admin_site.urls),
-    path('debug/', tenant_debug, name='tenant_debug_public'),
-    # La ruta de la API de autenticación ha sido removida
-    # Solo disponible en tenants de clínicas (subdominios)
+    
+    # ⚠️ IMPORTANTE: Rutas de pagos disponibles en dominio público para webhooks de Stripe
+    path('api/payments/', include('apps.payment_system.urls')),  # Sistema de pagos con Stripe
+    
+    # 🔧 RUTAS ADICIONALES PARA EL TENANT PÚBLICO:
+    # Permitir autenticación básica en el tenant público (útil para admin)
+    path('api/auth/', include('apps.authentication.urls')),      # Autenticación básica
+    
+    # API browsable (para desarrollo en tenant público)
+    path('api-auth/', include('rest_framework.urls')),
 ]

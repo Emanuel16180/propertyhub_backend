@@ -42,6 +42,14 @@ SHARED_APPS = (
     'django.contrib.staticfiles',
     'corsheaders',
     'channels',  # Para WebSocket
+    
+    # ⚠️ CRÍTICO: AUTH debe estar en SHARED para que funcione el middleware
+    'django.contrib.auth',
+    'apps.users',  # Modelo de usuario personalizado debe estar en SHARED_APPS
+    'apps.authentication',  # ⚠️ CRÍTICO: Para que /api/auth/ funcione en público
+    'apps.payment_system',  # ⚠️ CRÍTICO: Para webhooks de Stripe en público
+    'rest_framework',       # ⚠️ CRÍTICO: Para que funcione api-auth
+    'rest_framework.authtoken',  # ⚠️ CRÍTICO: Para tokens en público
 )
 
 # --- APLICACIONES DEL INQUILINO (TENANT) ---
@@ -64,6 +72,7 @@ TENANT_APPS = (
     'apps.chat',
     'apps.clinical_history',
     'apps.clinic_admin',  # Administración interna de la clínica (CU-30, CU-07)
+    'apps.payment_system',  # Sistema de pagos con Stripe
 )
 
 # --- CONFIGURACIÓN FINAL DE INSTALLED_APPS ---
@@ -72,7 +81,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
-    'fix_tenant_middleware.FixTenantURLConfMiddleware',  # Fuerza URLconf correcto
+    # 'fix_tenant_middleware.FixTenantURLConfMiddleware',  # ❌ DESHABILITADO: Interfiere con django-tenants
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -130,6 +139,9 @@ TENANT_MODEL = "tenants.Clinic"
 
 # URL del esquema público (donde vivirá la gestión de clínicas)
 TENANT_DOMAIN_MODEL = "tenants.Domain"
+
+# ⚠️ CRÍTICO: Nombre del esquema público (REQUERIDO por django-tenants)
+PUBLIC_SCHEMA_NAME = 'public'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -298,3 +310,10 @@ DEFAULT_FROM_EMAIL = 'Equipo de Psico SAS <isaelortiz74@gmail.com>'
 
 # Asegúrate de que la versión de consola ESTÉ comentada o eliminada:
 # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# ---------------------------------------------------------------
+# CONFIGURACIÓN DE STRIPE PARA PAGOS
+# ---------------------------------------------------------------
+STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
+STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY") 
+STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET")

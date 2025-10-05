@@ -119,10 +119,8 @@ except ImportError:
 try:
     from apps.clinical_history.models import SessionNote, ClinicalDocument
     from apps.clinical_history.admin import SessionNoteAdmin, ClinicalDocumentAdmin
-    # Estos modelos ya se registran en su admin.py, pero los agregamos al tenant admin
-    if not tenant_admin_site.is_registered(SessionNote):
-        tenant_admin_site.register(SessionNote, SessionNoteAdmin)
-    if not tenant_admin_site.is_registered(ClinicalDocument):
-        tenant_admin_site.register(ClinicalDocument, ClinicalDocumentAdmin)
+    # Registrar en el admin de tenant (ya no están en admin por defecto)
+    tenant_admin_site.register(SessionNote, SessionNoteAdmin)
+    tenant_admin_site.register(ClinicalDocument, ClinicalDocumentAdmin)
 except ImportError:
     pass

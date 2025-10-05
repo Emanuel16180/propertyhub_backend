@@ -3,7 +3,9 @@
 from django.contrib import admin
 from .models import SessionNote, ClinicalDocument
 
-@admin.register(SessionNote)
+# ❌ NO USAR @admin.register() - Interfiere con multi-tenancy
+# Los modelos se registran manualmente en config/admin_site.py
+
 class SessionNoteAdmin(admin.ModelAdmin):
     list_display = ('appointment', 'appointment_date', 'patient_name', 'created_at', 'updated_at')
     list_filter = ('created_at', 'updated_at', 'appointment__appointment_date')
@@ -19,7 +21,6 @@ class SessionNoteAdmin(admin.ModelAdmin):
     patient_name.short_description = 'Paciente'
 
 
-@admin.register(ClinicalDocument)
 class ClinicalDocumentAdmin(admin.ModelAdmin):
     list_display = ('description', 'patient_name', 'uploaded_by_name', 'uploaded_at', 'file_name')
     list_filter = ('uploaded_at', 'uploaded_by')
