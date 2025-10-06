@@ -11,10 +11,69 @@ class PublicAdminSite(admin.AdminSite):
     """
     site_header = "Administración Global de Psico SAS"
     site_title = "Admin Global"
-    index_title = "Gestión de Clínicas"
+    index_title = "Gestión Centralizada de Clínicas"
+    index_template = "admin/public_index.html"  # Usar nuestra plantilla personalizada
     
     # Le decimos que use nuestro formulario de login personalizado
     login_form = PublicAdminAuthenticationForm
+    
+    def index(self, request, extra_context=None):
+        """
+        Personalizar el dashboard principal con estadísticas reales
+        """
+        extra_context = extra_context or {}
+        
+        try:
+            from django_tenants.utils import schema_context
+            from apps.users.models import CustomUser
+            
+            # Obtener estadísticas de clínicas reales (excluyendo public)
+            real_clinics = Clinic.objects.exclude(schema_name='public')
+            total_clinics = real_clinics.count()
+            total_domains = Domain.objects.count()
+            active_domains = Domain.objects.filter(tenant__isnull=False).count()
+            
+            # Calcular usuarios totales de todas las clínicas reales
+            total_users_real_clinics = 0
+            total_patients = 0
+            total_professionals = 0
+            
+            for clinic in real_clinics:
+                try:
+                    with schema_context(clinic.schema_name):
+                        clinic_users = CustomUser.objects.count()
+                        clinic_patients = CustomUser.objects.filter(user_type='patient').count()
+                        clinic_professionals = CustomUser.objects.filter(user_type='professional').count()
+                        
+                        total_users_real_clinics += clinic_users
+                        total_patients += clinic_patients
+                        total_professionals += clinic_professionals
+                except Exception:
+                    pass
+            
+            # Agregar estadísticas al contexto
+            extra_context.update({
+                'total_clinics': total_clinics,
+                'total_domains': total_domains,
+                'active_domains': active_domains,
+                'total_users_real_clinics': total_users_real_clinics,
+                'total_patients': total_patients,
+                'total_professionals': total_professionals,
+            })
+            
+        except Exception as e:
+            # En caso de error, mostrar valores por defecto
+            extra_context.update({
+                'total_clinics': 0,
+                'total_domains': 0,
+                'active_domains': 0,
+                'total_users_real_clinics': 0,
+                'total_patients': 0,
+                'total_professionals': 0,
+                'stats_error': str(e),
+            })
+        
+        return super().index(request, extra_context)
 
 class TenantAdminSite(admin.AdminSite):
     """
@@ -47,11 +106,45 @@ tenant_admin_site = TenantAdminSite(name='tenant_admin')
 # --- ADMIN CLASSES PARA PÚBLICO ---
 
 class ClinicAdmin(admin.ModelAdmin):
-    """Admin para gestionar clínicas"""
-    list_display = ('name', 'schema_name', 'created_on')
+    """Admin para gestionar clínicas con estadísticas dinámicas"""
+    list_display = ('name', 'schema_name', 'get_user_count', 'get_primary_domain', 'created_on')
     search_fields = ('name', 'schema_name')
     readonly_fields = ('created_on',)
     list_filter = ('created_on',)
+    
+    def get_queryset(self, request):
+        """Mostrar solo clínicas reales, excluyendo el schema público"""
+        return super().get_queryset(request).exclude(schema_name='public')
+    
+    def get_user_count(self, obj):
+        """Obtener el conteo real de usuarios para esta clínica"""
+        try:
+            from django_tenants.utils import schema_context
+            from apps.users.models import CustomUser
+            
+            with schema_context(obj.schema_name):
+                user_count = CustomUser.objects.count()
+                patients = CustomUser.objects.filter(user_type='patient').count()
+                professionals = CustomUser.objects.filter(user_type='professional').count()
+                
+            return f"{user_count} usuarios ({patients}P, {professionals}Pr)"
+        except Exception:
+            return "Error"
+    
+    get_user_count.short_description = "Usuarios"
+    get_user_count.admin_order_field = 'name'
+    
+    def get_primary_domain(self, obj):
+        """Obtener el dominio principal de la clínica"""
+        try:
+            primary_domain = Domain.objects.filter(tenant=obj, is_primary=True).first()
+            if primary_domain:
+                return f"{primary_domain.domain}"
+            return "Sin dominio"
+        except Exception:
+            return "Error"
+    
+    get_primary_domain.short_description = "Dominio Principal"
 
 class DomainAdmin(admin.ModelAdmin):
     """Admin para gestionar dominios"""
