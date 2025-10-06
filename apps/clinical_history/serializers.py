@@ -1,7 +1,7 @@
 # apps/clinical_history/serializers.py
 
 from rest_framework import serializers
-from .models import SessionNote, ClinicalDocument
+from .models import SessionNote, ClinicalDocument, ClinicalHistory  # <-- 1. IMPORTA EL NUEVO MODELO
 from apps.users.models import CustomUser
 
 class SessionNoteSerializer(serializers.ModelSerializer):
@@ -73,3 +73,34 @@ class PsychologistPatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'first_name', 'last_name', 'full_name', 'email']
+
+
+# --- 👇 AÑADE ESTA NUEVA CLASE AL FINAL DEL ARCHIVO 👇 ---
+
+class ClinicalHistorySerializer(serializers.ModelSerializer):
+    """
+    Serializer para leer y escribir en el modelo de Historial Clínico.
+    """
+    class Meta:
+        model = ClinicalHistory
+        # Incluimos todos los campos que definimos en el modelo
+        fields = [
+            'patient',
+            'consultation_reason',
+            'history_of_illness',
+            'personal_pathological_history',
+            'family_history',
+            'personal_non_pathological_history',
+            'mental_examination',
+            'complementary_tests',
+            'diagnoses',
+            'therapeutic_plan',
+            'risk_assessment',
+            'sensitive_topics',
+            'created_by',
+            'last_updated_by',
+            'created_at',
+            'updated_at',
+        ]
+        # Hacemos que ciertos campos sean de solo lectura para proteger los datos
+        read_only_fields = ['patient', 'created_by', 'created_at', 'updated_at']

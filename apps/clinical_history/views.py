@@ -3,8 +3,9 @@
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import SessionNote, ClinicalDocument
-from .serializers import SessionNoteSerializer, ClinicalDocumentSerializer, PsychologistPatientSerializer
+from django.shortcuts import get_object_or_404
+from .models import SessionNote, ClinicalDocument, ClinicalHistory  # <-- IMPORTA ClinicalHistory
+from .serializers import SessionNoteSerializer, ClinicalDocumentSerializer, PsychologistPatientSerializer, ClinicalHistorySerializer  # <-- IMPORTA ClinicalHistorySerializer
 from apps.appointments.models import Appointment
 from apps.users.models import CustomUser
 
@@ -156,3 +157,58 @@ class DocumentUploadView(generics.CreateAPIView):
             )
         
         return super().create(request, *args, **kwargs)
+
+
+# --- 👇 AÑADE ESTE NUEVO CÓDIGO AL FINAL DEL ARCHIVO 👇 ---
+
+class IsOwnerOrAssociatedProfessional(permissions.BasePermission):
+    """
+    Permiso para permitir el acceso al historial clínico solo al propio paciente
+    o a un profesional que haya tenido al menos una cita con ese paciente.
+    """
+    def has_permission(self, request, view):
+        patient_id = view.kwargs.get('patient_id')
+        user = request.user
+
+        if not user.is_authenticated:
+            return False
+
+        # El paciente puede ver su propio historial
+        if user.id == patient_id and user.user_type == 'patient':
+            return True
+
+        # El profesional puede acceder si ha tenido una cita con el paciente
+        if user.user_type == 'professional':
+            has_appointment = Appointment.objects.filter(
+                psychologist=user,
+                patient_id=patient_id
+            ).exists()
+            return has_appointment
+
+        return False
+
+
+class ClinicalHistoryDetailView(generics.RetrieveUpdateAPIView):
+    """
+    Vista para obtener y actualizar el historial clínico de un paciente.
+    Maneja la creación si el historial no existe.
+    """
+    queryset = ClinicalHistory.objects.all()
+    serializer_class = ClinicalHistorySerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrAssociatedProfessional]
+    lookup_field = 'patient_id'
+
+    def get_object(self):
+        # Obtener el historial. Si no existe, se crea uno nuevo vacío.
+        patient_id = self.kwargs.get('patient_id')
+        patient = get_object_or_404(CustomUser, id=patient_id, user_type='patient')
+
+        history, created = ClinicalHistory.objects.get_or_create(
+            patient=patient,
+            defaults={'created_by': self.request.user}  # Asigna quien lo creó por primera vez
+        )
+        return history
+
+    def perform_update(self, serializer):
+        # Asigna automáticamente al profesional que está realizando la última actualización.
+        serializer.save(last_updated_by=self.request.user)
