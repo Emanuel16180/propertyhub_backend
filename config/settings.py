@@ -77,6 +77,7 @@ TENANT_APPS = (
     'apps.clinic_admin',  # Administración interna de la clínica (CU-30, CU-07)
     'apps.payment_system',  # Sistema de pagos con Stripe
     'apps.backups',  # <-- AÑADE ESTA LÍNEA
+    'apps.auditlog',  # Sistema de bitácora de auditoría
 )
 
 # --- CONFIGURACIÓN FINAL DE INSTALLED_APPS ---
@@ -85,6 +86,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
+    'apps.auditlog.local.RequestLocalStorageMiddleware',  # Capturar request para logs
    'fix_tenant_middleware.FixTenantURLConfMiddleware',  # ❌ DESHABILITADO: Interfiere con django-tenants
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -321,3 +323,66 @@ DEFAULT_FROM_EMAIL = 'Equipo de Psico SAS <isaelortiz74@gmail.com>'
 STRIPE_PUBLISHABLE_KEY = config("STRIPE_PUBLISHABLE_KEY")
 STRIPE_SECRET_KEY = config("STRIPE_SECRET_KEY") 
 STRIPE_WEBHOOK_SECRET = config("STRIPE_WEBHOOK_SECRET")
+
+# ---------------------------------------------------------------
+# CONFIGURACIÓN DE LOGGING Y BITÁCORA
+# ---------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'add_request_info': {
+            '()': 'apps.auditlog.filters.RequestInfoFilter',
+        },
+    },
+    'handlers': {
+        # Handler para mostrar logs en la consola
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        # Handler para guardar logs en un archivo
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 2,
+            'formatter': 'verbose',
+        },
+        # Handler para guardar en la base de datos (nuestra bitácora)
+        'database': {
+            'level': 'INFO',
+            'class': 'apps.auditlog.handlers.DatabaseLogHandler',
+            'filters': ['add_request_info'],  # Usamos el filtro para añadir IP y usuario
+        },
+    },
+    'loggers': {
+        # Logger para capturar todo lo que pasa en nuestras 'apps'
+        'apps': {
+            'handlers': ['console', 'file', 'database'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        # Logger para Django en general
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

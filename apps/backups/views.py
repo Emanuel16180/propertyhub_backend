@@ -17,19 +17,21 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from apps.clinic_admin.permissions import IsClinicAdmin
 import logging
 
-logger = logging.getLogger(__name__)
+# Cambiar para usar el logger de 'apps' que va a la base de datos
+logger = logging.getLogger('apps')
 
 class CreateBackupAndDownloadView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsClinicAdmin]
 
     def post(self, request, *args, **kwargs):
-        # Primero, intenta crear el respaldo con pg_dump
+        # 🔽 EJEMPLO DE REGISTRO
+        logger.info(f"Usuario '{request.user.email}' solicitó crear un backup.")
         try:
             logger.info("Intentando crear backup con pg_dump...")
             return self._create_backup_with_pg_dump(request)
         except Exception as e:
-            logger.warning(f"pg_dump falló con el error: {e}. Usando el método de respaldo de Django.")
-            # Si pg_dump falla por cualquier razón, usa el método de Django
+            # 🔽 EJEMPLO DE REGISTRO DE ADVERTENCIA
+            logger.warning(f"pg_dump falló. Usando fallback de Django. Error: {e}")
             return self._create_backup_with_django(request)
 
     def _create_backup_with_pg_dump(self, request):
@@ -39,8 +41,9 @@ class CreateBackupAndDownloadView(APIView):
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')
         filename = f"backup-sql-{schema_name}-{timestamp}.sql"
 
+        # --- CORRECCIÓN 1: Usar '127.0.0.1' en lugar de db_settings['HOST'] ---
         command = [
-            'pg_dump', '--dbname', db_settings['NAME'], '--host', db_settings['HOST'],
+            'pg_dump', '--dbname', db_settings['NAME'], '--host', '127.0.0.1',
             '--port', str(db_settings['PORT']), '--username', db_settings['USER'],
             '--schema', schema_name, '--format', 'p', '--inserts', '--no-owner', '--no-privileges'
         ]
@@ -50,9 +53,12 @@ class CreateBackupAndDownloadView(APIView):
         stdout, stderr = process.communicate()
 
         if process.returncode != 0:
-            # Si hay un error, lo lanza para que sea capturado por el try...except principal
+            logger.error(f"Error en pg_dump: {stderr.decode()}")
             raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
 
+        # 🔽 EJEMPLO DE REGISTRO DE ÉXITO
+        logger.info(f"Backup SQL creado exitosamente para el schema '{request.tenant.schema_name}'.")
+        
         response = HttpResponse(stdout, content_type='application/sql')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
@@ -63,11 +69,14 @@ class CreateBackupAndDownloadView(APIView):
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H%M%S')
         filename = f"backup-json-{schema_name}-{timestamp}.json"
 
+        logger.info(f"Creando backup JSON para {schema_name} usando Django dumpdata.")
+
         buffer = StringIO()
-        # Especificamos las apps que pertenecen a un tenant para no incluir las compartidas innecesarias
         tenant_apps = ['users', 'professionals', 'appointments', 'chat', 'clinical_history', 'payment_system']
         call_command('dumpdata', *tenant_apps, format='json', indent=2, stdout=buffer)
         buffer.seek(0)
+
+        logger.info(f"Backup JSON creado exitosamente para el schema '{schema_name}'.")
 
         response = HttpResponse(buffer.getvalue(), content_type='application/json')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -83,6 +92,14 @@ class RestoreBackupFromFileView(APIView):
             return Response({'error': 'No se proporcionó ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
 
         backup_file = request.FILES['backup_file']
+        
+        # 🔽 EJEMPLO DE REGISTRO
+        logger.info(f"Usuario '{request.user.email}' inició una restauración con el archivo '{backup_file.name}'.")
+        
+        # --- CORRECCIÓN ADICIONAL: Prohibir restaurar el schema 'public' ---
+        if request.tenant.schema_name == 'public':
+            logger.warning(f"Usuario '{request.user.email}' intentó restaurar el esquema público (prohibido).")
+            return Response({'error': 'No está permitido restaurar el esquema público.'}, status=status.HTTP_403_FORBIDDEN)
 
         if backup_file.name.endswith('.sql'):
             return self._restore_sql_backup(request, backup_file)
@@ -95,10 +112,14 @@ class RestoreBackupFromFileView(APIView):
         schema_name = request.tenant.schema_name
         db_settings = settings.DATABASES['default']
         env = {'PGPASSWORD': db_settings['PASSWORD']}
+        
+        logger.info(f"Iniciando restauración SQL para el schema '{schema_name}'.")
+        
         try:
+            # --- CORRECCIÓN 1: Usar '127.0.0.1' en la conexión ---
             conn = psycopg2.connect(
                 dbname=db_settings['NAME'], user=db_settings['USER'],
-                password=db_settings['PASSWORD'], host=db_settings['HOST'], port=db_settings['PORT']
+                password=db_settings['PASSWORD'], host='127.0.0.1', port=db_settings['PORT']
             )
             conn.autocommit = True
             with conn.cursor() as cursor:
@@ -107,40 +128,51 @@ class RestoreBackupFromFileView(APIView):
                 cursor.execute(f'GRANT ALL ON SCHEMA "{schema_name}" TO "{db_settings["USER"]}";')
             conn.close()
 
+            logger.info(f"Schema '{schema_name}' recreado exitosamente.")
+
+            # --- CORRECCIÓN 1: Usar '127.0.0.1' para psql ---
             restore_command = [
-                'psql', '--dbname', db_settings['NAME'], '--host', db_settings['HOST'],
+                'psql', '--dbname', db_settings['NAME'], '--host', '127.0.0.1',
                 '--port', str(db_settings['PORT']), '--username', db_settings['USER'],
                 '--single-transaction'
             ]
             process = subprocess.run(restore_command, input=backup_file.read(), capture_output=True, check=True, env=env)
+            
+            # 🔽 EJEMPLO DE REGISTRO DE ÉXITO
+            logger.info(f"Restauración SQL completada para el schema '{request.tenant.schema_name}'.")
             return Response({'status': 'Restauración desde SQL completada.'}, status=status.HTTP_200_OK)
         except subprocess.CalledProcessError as e:
+            # 🔽 EJEMPLO DE REGISTRO DE ERROR
+            logger.error(f"Error en subprocess de restauración SQL: {e.stderr.decode()}")
             return Response({'error': f"Error en la restauración SQL: {e.stderr.decode()}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
+            # 🔽 EJEMPLO DE REGISTRO DE ERROR CRÍTICO
+            logger.error(f"FALLO CRÍTICO en la restauración SQL: {e}", exc_info=True)
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _restore_json_backup(self, request, backup_file):
         """Restaura desde un archivo JSON usando archivos temporales."""
         temp_file_path = None
+        
+        logger.info(f"Iniciando restauración JSON para el schema '{request.tenant.schema_name}'.")
+        
         try:
-            # 1. Crear un archivo temporal seguro
             with tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.json', encoding='utf-8') as temp_file:
-                # Escribir el contenido del archivo subido al archivo temporal
                 temp_file.write(backup_file.read().decode('utf-8'))
                 temp_file_path = temp_file.name
             
-            # 2. Borrar solo los datos del tenant actual usando ORM (más seguro)
+            logger.info("Limpiando datos del tenant de forma segura (preservando admins).")
             self._clear_tenant_data_safe()
             
-            # 3. Cargar los datos desde el archivo temporal
+            logger.info(f"Cargando datos desde archivo temporal: {temp_file_path}")
             call_command('loaddata', temp_file_path)
             
+            logger.info(f"Restauración JSON completada para el schema '{request.tenant.schema_name}'.")
             return Response({'status': 'Restauración desde JSON completada.'}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"Error en restauración JSON: {str(e)}")
             return Response({'error': f"Error en la restauración JSON: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         finally:
-            # 4. Asegurarse de que el archivo temporal se borre siempre
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
@@ -149,64 +181,27 @@ class RestoreBackupFromFileView(APIView):
                     logger.warning(f"No se pudo eliminar archivo temporal {temp_file_path}: {e}")
 
     def _clear_tenant_data_safe(self):
-        """Borra solo los datos del tenant actual usando ORM de Django (método más seguro)."""
+        """Borra solo los datos del tenant actual, preservando los administradores."""
         try:
-            # Importar modelos localmente para evitar problemas de importación circular
-            from apps.users.models import CustomUser, PatientProfile, ProfessionalProfile
-            from apps.appointments.models import Appointment, PsychologistAvailability
+            from apps.users.models import CustomUser
+            from apps.appointments.models import Appointment
             from apps.chat.models import ChatMessage
+            from apps.professionals.models import ProfessionalProfile
+            from apps.users.models import PatientProfile
             
-            # Borrar en orden para respetar foreign keys
-            logger.info("Iniciando limpieza de datos del tenant...")
+            logger.info("Iniciando limpieza de datos del tenant (preservando admins)...")
             
-            # 1. Borrar mensajes de chat
             ChatMessage.objects.all().delete()
-            logger.info("Mensajes de chat eliminados")
-            
-            # 2. Borrar citas
             Appointment.objects.all().delete()
-            logger.info("Citas eliminadas")
-            
-            # 3. Borrar disponibilidades
-            PsychologistAvailability.objects.all().delete()
-            logger.info("Disponibilidades eliminadas")
-            
-            # 4. Borrar perfiles de pacientes y profesionales
             PatientProfile.objects.all().delete()
             ProfessionalProfile.objects.all().delete()
-            logger.info("Perfiles eliminados")
             
-            # 5. Borrar usuarios (excepto superusuarios para evitar problemas)
-            CustomUser.objects.filter(is_superuser=False).delete()
-            logger.info("Usuarios no-admin eliminados")
+            # --- CORRECCIÓN 2: No eliminar usuarios 'admin' ---
+            CustomUser.objects.filter(user_type__in=['patient', 'professional']).delete()
+            logger.info("Usuarios de tipo 'paciente' y 'profesional' eliminados.")
             
-            logger.info("Limpieza de datos del tenant completada exitosamente")
+            logger.info("Limpieza de datos del tenant completada exitosamente.")
             
         except Exception as e:
             logger.error(f"Error en limpieza segura de datos: {e}")
-            # Si falla todo, intentar un método alternativo más agresivo
-            try:
-                from django.db import connection
-                schema_name = connection.tenant.schema_name
-                logger.warning(f"Intentando limpieza alternativa para {schema_name}")
-                
-                with connection.cursor() as cursor:
-                    # Borrar solo las tablas principales del tenant
-                    tables_to_clear = [
-                        'chat_chatmessage',
-                        'appointments_appointment', 
-                        'appointments_psychologistavailability',
-                        'users_patientprofile',
-                        'users_professionalprofile',
-                    ]
-                    
-                    for table in tables_to_clear:
-                        try:
-                            cursor.execute(f'DELETE FROM "{table}"')
-                            logger.info(f"Tabla {table} limpiada")
-                        except Exception as table_error:
-                            logger.warning(f"No se pudo limpiar {table}: {table_error}")
-                            
-            except Exception as fallback_error:
-                logger.error(f"Error en método de limpieza alternativo: {fallback_error}")
-                raise
+            raise
