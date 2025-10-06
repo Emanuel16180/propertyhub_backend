@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/admin/', include('apps.clinic_admin.urls')),  # CU-30, CU-07 gestión interna de usuarios y verificación
     path('api/payments/', include('apps.payment_system.urls')),  # Sistema de pagos con Stripe
     path('api/chat/', include('apps.chat.urls')),           # Chat por WebSocket
+    path('api/backups/', include('apps.backups.urls')),     # <-- AÑADE ESTA LÍNEA
     
     # API browsable (para desarrollo)
     path('api-auth/', include('rest_framework.urls')),

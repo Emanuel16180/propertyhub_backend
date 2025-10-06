@@ -76,6 +76,7 @@ TENANT_APPS = (
     'apps.clinical_history',
     'apps.clinic_admin',  # Administración interna de la clínica (CU-30, CU-07)
     'apps.payment_system',  # Sistema de pagos con Stripe
+    'apps.backups',  # <-- AÑADE ESTA LÍNEA
 )
 
 # --- CONFIGURACIÓN FINAL DE INSTALLED_APPS ---
