@@ -45,6 +45,11 @@ def register_user(request):
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# apps/authentication/views.py
+
+# ... (otras importaciones y vistas no cambian) ...
+
+# 👇 REEMPLAZA ESTA FUNCIÓN COMPLETA 👇
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([permissions.AllowAny])
@@ -52,6 +57,31 @@ def login_user(request):
     serializer = UserLoginSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         user = serializer.validated_data['user']
+        
+        # --- INICIO DE LA CORRECCIÓN ---
+        # Importamos el modelo PublicUser para poder comprobar de qué tipo es el usuario
+        from apps.tenants.models import PublicUser
+
+        # Si el usuario autenticado es una instancia de PublicUser, es el admin global.
+        if isinstance(user, PublicUser):
+            # Para el admin global, no generamos un token de API.
+            # Su autenticación se maneja por sesiones de Django para el /admin/.
+            # Devolvemos una respuesta especial para que el frontend sepa cómo actuar.
+            return Response({
+                'message': 'Sesión de administrador global iniciada exitosamente.',
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'user_type': 'superuser',  # Un tipo especial para que el frontend lo reconozca
+                },
+                'token': 'global-admin-session' # Enviamos un token simulado
+            }, status=status.HTTP_200_OK)
+        # --- FIN DE LA CORRECCIÓN ---
+
+        # Si no es un PublicUser, es un CustomUser de una clínica.
+        # Continuamos con la lógica original de crear un token.
         token, created = Token.objects.get_or_create(user=user)
         return Response({
             'message': 'Sesión iniciada exitosamente',
@@ -64,8 +94,10 @@ def login_user(request):
             },
             'token': token.key
         }, status=status.HTTP_200_OK)
+        
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# ... (el resto de las vistas no cambian) ...
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def logout_user(request):

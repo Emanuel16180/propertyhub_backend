@@ -33,6 +33,7 @@ ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,bienestar.l
 
 # --- APLICACIONES COMPARTIDAS ---
 # Solo lo absolutamente esencial que es global para todas las clínicas.
+# --- APLICACIONES COMPARTIDAS ---
 SHARED_APPS = (
     'django_tenants',  # Componente principal de django-tenants
     'apps.tenants',    # App para gestionar las clínicas
@@ -43,8 +44,10 @@ SHARED_APPS = (
     'corsheaders',
     'channels',  # Para WebSocket
     
-    # ⚠️ CRÍTICO: AUTH debe estar en SHARED para que funcione el middleware
+    # ⚠️ CRÍTICO: AUTH y ADMIN deben estar en SHARED para que funcione el middleware
     'django.contrib.auth',
+    'django.contrib.admin',  # <-- MOVIDO AQUÍ desde TENANT_APPS
+    
     'apps.users',  # Modelo de usuario personalizado debe estar en SHARED_APPS
     'apps.authentication',  # ⚠️ CRÍTICO: Para que /api/auth/ funcione en público
     'apps.payment_system',  # ⚠️ CRÍTICO: Para webhooks de Stripe en público
@@ -55,16 +58,16 @@ SHARED_APPS = (
 # --- APLICACIONES DEL INQUILINO (TENANT) ---
 # Todo lo que una clínica individual necesita.
 TENANT_APPS = (
-    # Apps de Django que necesita cada clínica
-    'django.contrib.admin',
-    'django.contrib.auth',
+    # Apps de Django (ya están en SHARED_APPS, no necesitan repetirse)
+    # 'django.contrib.admin',  # <-- REMOVIDO: Ya está en SHARED_APPS
+    'django.contrib.auth',       # Necesario para permisos por tenant
     'django.contrib.contenttypes',  # También necesario en tenants
     'django.contrib.sessions',      # También necesario en tenants  
     'django.contrib.messages',      # También necesario en tenants
     'rest_framework',
     'rest_framework.authtoken',
     
-    # Todas tus apps funcionales
+    # Todas tus apps funcionales específicas de cada clínica
     'apps.users',
     'apps.authentication',
     'apps.professionals',
@@ -81,7 +84,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',  # DEBE ser el primero
-    # 'fix_tenant_middleware.FixTenantURLConfMiddleware',  # ❌ DESHABILITADO: Interfiere con django-tenants
+   'fix_tenant_middleware.FixTenantURLConfMiddleware',  # ❌ DESHABILITADO: Interfiere con django-tenants
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

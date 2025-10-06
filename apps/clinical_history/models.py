@@ -64,3 +64,68 @@ class ClinicalDocument(models.Model):
 
     def __str__(self):
         return f"Documento '{self.description}' para {self.patient.get_full_name()}"
+
+
+# --- 👇 AÑADIDO: NUEVO MODELO PARA HISTORIAL CLÍNICO COMPLETO 👇 ---
+
+class ClinicalHistory(models.Model):
+    """
+    Modelo central para almacenar el historial clínico completo de un paciente.
+    """
+    # --- VÍNCULO CON EL PACIENTE ---
+    patient = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='clinical_history',
+        limit_choices_to={'user_type': 'patient'},
+        primary_key=True # Cada paciente tendrá solo UNA historia clínica
+    )
+
+    # --- SECCIONES DEL HISTORIAL ---
+
+    # Motivo e Historia
+    consultation_reason = models.TextField(blank=True, help_text="Frase textual del paciente sobre el motivo de consulta.")
+    history_of_illness = models.TextField(blank=True, help_text="Relato cronológico de la enfermedad actual (HEA).")
+
+    # Antecedentes
+    personal_pathological_history = models.TextField(blank=True, help_text="Enfermedades previas, cirugías, trastornos mentales, etc.")
+    family_history = models.TextField(blank=True, help_text="Trastornos mentales, suicidio, adicciones en la familia.")
+    personal_non_pathological_history = models.JSONField(default=dict, blank=True, help_text="Hábitos de alimentación, sueño, consumo de sustancias, etc.")
+
+    # Examen / Exploración
+    mental_examination = models.JSONField(default=dict, blank=True, help_text="Resultados de la exploración mental (conciencia, orientación, lenguaje, etc.).")
+    complementary_tests = models.TextField(blank=True, help_text="Resultados de pruebas de laboratorio, gabinete o psicométricas.")
+
+    # Diagnóstico y Plan
+    diagnoses = models.JSONField(default=list, blank=True, help_text="Lista de diagnósticos (principal y secundarios) con códigos CIE-10/DSM-5.")
+    therapeutic_plan = models.JSONField(default=dict, blank=True, help_text="Plan farmacológico, psicoterapéutico e intervenciones sociales.")
+
+    # Riesgos y Alertas
+    risk_assessment = models.JSONField(default=dict, blank=True, help_text="Evaluación de riesgos (autolesión, heteroagresión, recaída).")
+    sensitive_topics = models.TextField(blank=True, help_text="Temas delicados a tratar con cuidado.")
+
+    # --- METADATOS ---
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_histories',
+        help_text="Profesional que creó el historial."
+    )
+    last_updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_histories',
+        help_text="Último profesional que actualizó el historial."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Historial Clínico'
+        verbose_name_plural = 'Historiales Clínicos'
+
+    def __str__(self):
+        return f"Historial Clínico de {self.patient.get_full_name()}"

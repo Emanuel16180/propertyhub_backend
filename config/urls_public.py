@@ -15,6 +15,9 @@ urlpatterns = [
     # Permitir autenticación básica en el tenant público (útil para admin)
     path('api/auth/', include('apps.authentication.urls')),      # Autenticación básica
     
+    # API para gestión de clínicas/tenants
+    path('api/tenants/', include('apps.tenants.urls')),          # Gestión de clínicas
+    
     # API browsable (para desarrollo en tenant público)
     path('api-auth/', include('rest_framework.urls')),
 ]

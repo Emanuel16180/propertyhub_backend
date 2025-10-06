@@ -9,6 +9,8 @@ from apps.appointments.models import Appointment
 from apps.appointments.serializers import AppointmentCreateSerializer
 from django.shortcuts import get_object_or_404
 from apps.users.models import CustomUser
+from django_tenants.utils import tenant_context  # <-- IMPORTAR TENANT_CONTEXT
+from apps.tenants.models import Clinic  # <-- IMPORTAR CLÍNICA
 import logging
 
 # Configurar el logger
@@ -31,17 +33,35 @@ class CreateCheckoutSessionView(APIView):
         data = request.data
         psychologist_id = data.get('psychologist')
         
-        # 1. Validar y crear una cita preliminar en estado 'pending'
+        # 1. Validar que los datos de la cita sean correctos (horario disponible, etc.)
         # Usamos el AppointmentCreateSerializer que ya tiene toda la lógica de validación de horarios
         serializer = AppointmentCreateSerializer(data=data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        # Creamos la cita pero aún no está pagada
+        validated_data = serializer.validated_data
+
+        # --- CORRECCIÓN PARA ELIMINAR CITAS "FANTASMA" ---
+        # Antes de crear la nueva cita, buscamos y eliminamos cualquier cita "fantasma"
+        # (pendiente y no pagada) que ocupe el mismo horario.
+        # Esto libera el espacio si un pago anterior fue abandonado.
+        citas_fantasma_eliminadas = Appointment.objects.filter(
+            psychologist=validated_data['psychologist'],
+            appointment_date=validated_data['appointment_date'],
+            start_time=validated_data['start_time'],
+            status='pending',
+            is_paid=False
+        ).delete()
+        
+        if citas_fantasma_eliminadas[0] > 0:
+            logger.info(f"Eliminadas {citas_fantasma_eliminadas[0]} citas fantasma para liberar el horario")
+        # --- FIN DE LA CORRECCIÓN ---
+
+        # Ahora que el espacio está libre, creamos la nueva cita preliminar de forma segura
         appointment = serializer.save(status='pending', is_paid=False)
 
-        # 2. Obtener el precio de la consulta
-        psychologist = get_object_or_404(CustomUser, id=psychologist_id)
+        # 2. Obtener el precio de la consulta del psicólogo
+        psychologist = validated_data['psychologist']  # Usar los datos ya validados
         
         # Verificar que el psicólogo tenga perfil profesional
         if not hasattr(psychologist, 'professional_profile'):
@@ -59,6 +79,26 @@ class CreateCheckoutSessionView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            # --- CORRECCIÓN MEJORADA PARA REDIRECCIÓN AL FRONTEND ---
+            # Obtenemos el host del backend (ej: bienestar.localhost:8000)
+            backend_host = request.get_host()
+            
+            # Detectamos diferentes puertos comunes del frontend
+            if ':8000' in backend_host:
+                # Puertos comunes para React: 3000, 5173, 5174, 5175
+                for frontend_port in ['5174', '5173', '3000', '5175']:
+                    frontend_host = backend_host.replace(':8000', f':{frontend_port}')
+                    break
+                else:
+                    # Fallback al puerto más común
+                    frontend_host = backend_host.replace(':8000', ':3000')
+            else:
+                # Si no tiene puerto específico, asumir puerto 3000
+                frontend_host = f"{backend_host}:3000"
+            
+            logger.info(f"Redirigiendo pagos desde {backend_host} hacia {frontend_host}")
+            # --- FIN DE LA CORRECCIÓN ---
+            
             # 3. Crear la sesión de pago en Stripe
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
@@ -76,21 +116,24 @@ class CreateCheckoutSessionView(APIView):
                     },
                 ],
                 mode='payment',
-                # URLs a las que Stripe redirigirá al usuario
-                success_url=f"http://{request.get_host()}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"http://{request.get_host()}/payment-cancelled",
+                # --- CORRECCIÓN: URLs ahora apuntan al frontend ---
+                success_url=f"http://{frontend_host}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"http://{frontend_host}/payment-cancel",
                 # Guardamos el ID de nuestra cita para saber qué actualizar después
                 metadata={
                     'appointment_id': appointment.id,
                     'patient_id': request.user.id,
-                    'psychologist_id': psychologist_id
+                    'psychologist_id': psychologist.id,
+                    'tenant_schema_name': request.tenant.schema_name  # <-- GUARDAR EL SCHEMA
                 }
             )
             
             logger.info(f"Sesión de pago creada: {checkout_session.id} para cita {appointment.id}")
             
+            # --- CORRECCIÓN: Devolver URL directa en lugar de solo sessionId ---
             return Response({
                 'sessionId': checkout_session.id,
+                'checkout_url': checkout_session.url,  # <-- URL directa para redirigir
                 'appointment_id': appointment.id,
                 'amount': fee,
                 'currency': 'USD'
@@ -140,41 +183,41 @@ class StripeWebhookView(APIView):
         # Manejar el evento checkout.session.completed
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
-            appointment_id = session.get('metadata', {}).get('appointment_id')
+            metadata = session.get('metadata', {})
+            appointment_id = metadata.get('appointment_id')
+            schema_name = metadata.get('tenant_schema_name')  # <-- OBTENER EL SCHEMA
 
-            if appointment_id:
+            if appointment_id and schema_name:
                 try:
-                    appointment = Appointment.objects.get(id=appointment_id)
-                    # ¡Pago exitoso! Actualizamos la cita
-                    appointment.is_paid = True
-                    appointment.status = 'confirmed'
-                    appointment.save()
-                    
-                    logger.info(f"Pago confirmado para cita {appointment_id}")
-                    
-                    # Aquí podrías añadir lógica adicional como:
-                    # - Enviar email de confirmación
-                    # - Crear notificación push
-                    # - Actualizar estadísticas
-                    
-                except Appointment.DoesNotExist:
-                    # La cita no fue encontrada, loguear este error
-                    logger.error(f"Cita {appointment_id} no encontrada en webhook")
+                    tenant = Clinic.objects.get(schema_name=schema_name)
+                    # --- CORRECCIÓN: ACTIVAR EL CONTEXTO DEL TENANT ---
+                    with tenant_context(tenant):
+                        appointment = Appointment.objects.get(id=appointment_id)
+                        appointment.is_paid = True
+                        appointment.status = 'confirmed'
+                        appointment.save()
+                        logger.info(f"Pago confirmado para cita {appointment_id} en schema {schema_name}")
+                    # --- FIN DE LA CORRECCIÓN ---
+                except (Clinic.DoesNotExist, Appointment.DoesNotExist) as e:
+                    logger.error(f"No se encontró la clínica o cita desde el webhook: schema={schema_name}, appt_id={appointment_id}, error={e}")
             else:
-                logger.warning("Webhook recibido sin appointment_id en metadata")
+                logger.warning(f"Webhook recibido sin datos completos: appointment_id={appointment_id}, schema_name={schema_name}")
         
         # Manejar cancelaciones de pago
         elif event['type'] == 'checkout.session.expired':
             session = event['data']['object']
-            appointment_id = session.get('metadata', {}).get('appointment_id')
+            metadata = session.get('metadata', {})
+            appointment_id = metadata.get('appointment_id')
+            schema_name = metadata.get('tenant_schema_name')
             
-            if appointment_id:
+            if appointment_id and schema_name:
                 try:
-                    appointment = Appointment.objects.get(id=appointment_id)
-                    # Liberar el horario si la sesión expira
-                    appointment.delete()
-                    logger.info(f"Cita {appointment_id} eliminada por sesión expirada")
-                except Appointment.DoesNotExist:
+                    tenant = Clinic.objects.get(schema_name=schema_name)
+                    with tenant_context(tenant):
+                        appointment = Appointment.objects.get(id=appointment_id)
+                        appointment.delete()
+                        logger.info(f"Cita {appointment_id} eliminada por sesión expirada en schema {schema_name}")
+                except (Clinic.DoesNotExist, Appointment.DoesNotExist):
                     pass
         
         return Response(status=status.HTTP_200_OK)
