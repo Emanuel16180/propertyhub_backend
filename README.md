@@ -1,1 +1,1 @@
-# Sistema de Gestión para Psicólogos - SAS SP1
+# Sistema de Gestión para Psicólogos - SAS
